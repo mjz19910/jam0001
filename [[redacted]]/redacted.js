@@ -18,9 +18,36 @@ function input_stream_for(string, filename) {
 	let line = 1
 	let column = 1
 
-	/* TODO: Don't have dumb code here */
+	let line_offsets=[];
+
+	function b_find_line_index(arr,x,start,end){
+		if(start > end){return [false,start];}
+		let mid=Math.floor((start+end)/2);
+		let val=arr[mid];
+		if (val === x)return [true,mid];
+		if(val > x){
+			// greater
+			return b_find_line_index(arr,x,start,mid-1);
+		}else{
+			// less
+			return b_find_line_index(arr,x,mid+1,end);
+		}
+	}
+
+	{
+		let lines=string.split('\n');
+		let cur_index=0,acc_offset=0;
+		for(;cur_index<lines.length;cur_index++){
+			acc_offset+=lines[cur_index].length;
+			line_offsets.push(acc_offset);
+			acc_offset++;
+		}
+		console.log('last',acc_offset,string.length,lines.length);
+	}
+
+	/* Note: Is there a better way, that we can avoid `string.split('\n')` */
 	function line_for(index) {
-		return string.slice(0, index + 1).split('\n').length
+		return b_find_line_index(line_offsets,index,0,line_offsets.length-1)-1;
 	}
 	function column_for(index) {
 		return index - string.lastIndexOf('\n', index)
