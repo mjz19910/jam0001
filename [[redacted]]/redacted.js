@@ -1,3 +1,18 @@
+class _input_stream_for_ret {
+	/**@arg {number} line @arg {number} column @arg {number} index @arg {string} string @arg {string} filename */
+	constructor(line,column,index,string,filename){
+		this._line=line;
+		this._column=column;
+		this._index=index;
+		this._string=string;
+		this._filename=filename;
+	}
+	get line() { return this._line }
+	get column() { return this._column }
+	get index(){ return this._index }
+	get string(){ return this._string }
+	get filename(){ return this._filename }
+}
 function input_stream_for(string, filename) {
 	let index = 0
 	let line = 1
@@ -11,13 +26,15 @@ function input_stream_for(string, filename) {
 		return index - string.lastIndexOf('\n', index)
 	}
 
+	return new _input_stream_for_ret(line,column,index,string,filename);
+
 	return {
 		get line() { return line },
 		get column() { return column },
 		get index() { return index },
 		get filename() { return filename },
 
-		try_consume(regex_str, name, cb=()=>null, match_predicate=()=>true) {
+		try_consume(regex_str, name, cb = () => null, match_predicate = () => true) {
 			const regex = new RegExp(regex_str, 'gm')
 			regex.lastIndex = index
 			const match = regex.exec(string)
@@ -42,7 +59,7 @@ function input_stream_for(string, filename) {
 					line_end: match_end_line,
 					column_start: match_start_column,
 					column_end: match_end_column,
-					groups 
+					groups
 				}
 				return token;
 			}
@@ -69,23 +86,23 @@ function* lex(input) {
 	const keywords = new Set(['with', 'do', 'done', 'if', 'then', 'else', 'while', 'holds'])
 	while (!input.at_end()) {
 		let token = input.try_consume('>>', '>>')
-		         || input.try_consume(':=', ':=')
-		         || input.try_consume('\\(', '(')
-		         || input.try_consume('\\)', ')')
-		         || input.try_consume('\\.', '.')
-		         || input.try_consume('[0-9]+', 'int', parseInt)
-		         || input.try_consume('([^ \t\r\n.>>:,()\\[\\]\']|>[^>]|\\[[^\[]|][^\\]]|:[^=])+', 'ident', s => s, s => !keywords.has(s))
-		         || input.try_consume(String.raw`\[\[([^\]]*|\][^\]])*]]`, 'comment', process_comment)
-		         || input.try_consume('\'(:?[^\']*|\'\')*\'', 'string', s => s.slice(1, -1).replace(/''/g, '\''))
-		         || input.try_consume('with', 'with')
-		         || input.try_consume('done', 'done')
-		         || input.try_consume('do', 'do')
-		         || input.try_consume('if', 'if')
-		         || input.try_consume('then', 'then')
-		         || input.try_consume('else', 'else')
-		         || input.try_consume('while', 'while')
-		         || input.try_consume('holds', 'holds')
-		         || input.try_consume('[ \t\r\n]+', 'whitespace')
+			|| input.try_consume(':=', ':=')
+			|| input.try_consume('\\(', '(')
+			|| input.try_consume('\\)', ')')
+			|| input.try_consume('\\.', '.')
+			|| input.try_consume('[0-9]+', 'int', parseInt)
+			|| input.try_consume('([^ \t\r\n.>>:,()\\[\\]\']|>[^>]|\\[[^\[]|][^\\]]|:[^=])+', 'ident', s => s, s => !keywords.has(s))
+			|| input.try_consume(String.raw`\[\[([^\]]*|\][^\]])*]]`, 'comment', process_comment)
+			|| input.try_consume('\'(:?[^\']*|\'\')*\'', 'string', s => s.slice(1, -1).replace(/''/g, '\''))
+			|| input.try_consume('with', 'with')
+			|| input.try_consume('done', 'done')
+			|| input.try_consume('do', 'do')
+			|| input.try_consume('if', 'if')
+			|| input.try_consume('then', 'then')
+			|| input.try_consume('else', 'else')
+			|| input.try_consume('while', 'while')
+			|| input.try_consume('holds', 'holds')
+			|| input.try_consume('[ \t\r\n]+', 'whitespace')
 		if (token === undefined)
 			throw console.log(input), new Error(`Failed lexing at ${input.filename}:${input.line}:${input.column}`)
 		if (token.kind === 'whitespace')
@@ -97,20 +114,61 @@ function* lex(input) {
 function build_parser() {
 	const parser = {
 		input_filename: null,
+		/**@type {input_stream_for} */
 		input_stream: null,
 		token_stream: null,
 		token_stream_index: 0,
 		for_input,
 		reset,
+		/**
+		 * @arg {'sequence'|'call'|'assignment'|'field_access'|'literal'|'lambda'|'cond'|'loop'|'parenthesized_expr'|'block'} rule_name
+		 */
 		parse(rule_name) {
 			result = {
 				comments: [],
 				parsetree: null
 			}
 
-			if (rule_name in rules)
-				result.parsetree = rules[rule_name]()
-			else 
+			if (rule_name in rules) {
+				switch (rule_name) {
+					case 'sequence':
+						result.parsetree = rules[rule_name]();
+						break;
+					case 'call':
+						result.parsetree = rules[rule_name]();
+						break;
+					case 'assignment':
+						result.parsetree = rules[rule_name]();
+						break;
+					case 'field_access':
+						result.parsetree = rules[rule_name]();
+						break;
+					case 'literal': {
+						let fn = rules[rule_name];
+						let ret = fn();
+						result.parsetree = ret;
+						break;
+					}
+					case 'lambda':
+						result.parsetree = rules[rule_name]();
+						break;
+					case 'cond':
+						result.parsetree = rules[rule_name]();
+						break;
+					case 'loop':
+						result.parsetree = rules[rule_name]();
+						break;
+					case 'parenthesized_expr':
+						result.parsetree = rules[rule_name]();
+						break;
+					case 'block':
+						result.parsetree = rules[rule_name]();
+						break;
+					default:
+						result.parsetree = rules[rule_name]();
+				}
+			}
+			else
 				result.parsetree = try_consume(rule_name)
 			return result
 		}
@@ -120,11 +178,11 @@ function build_parser() {
 		parsetree: null,
 	}
 	function for_input(contents, filename) {
-		parser.input_filename = filename
-		parser.input_stream = input_stream_for(contents, filename)
-		parser.token_stream = [...lex(parser.input_stream)]
-		reset()
-		return parser
+		parser.input_filename = filename;
+		parser.input_stream = input_stream_for(contents, filename);
+		parser.token_stream = [...lex(parser.input_stream)];
+		reset();
+		return parser;
 	}
 	function reset() {
 		parser.token_stream_index = 0
@@ -174,20 +232,21 @@ function build_parser() {
 	}
 
 	const obvious = () =>
-		literal() || lambda() || cond() || loop() || parenthesized_expr() || block() || try_consume('ident')
+		literal() || lambda() || cond() || loop() || parenthesized_expr() || block() || try_consume('ident');
+	/**@returns {{ kind: 'sequence', statements, children }} */
 	function sequence() {
-		const statements = [assignment() || fail()]
-		const children = [...statements]
+		const statements = [assignment() || fail()];
+		const children = [...statements];
 		let current_dot
 		while ((current_dot = try_consume('.')) !== undefined) {
-			children.push(current_dot)
+			children.push(current_dot);
 			const statement = assignment() || obvious()
 			if (statement === undefined)
-				break
-			statements.push(statement)
-			children.push(statement)
+				break;
+			statements.push(statement);
+			children.push(statement);
 		}
-		return { kind: 'sequence', statements, children }
+		return { kind: 'sequence', statements, children };
 	}
 	function call() {
 		const func = field_access() || obvious()
@@ -195,7 +254,7 @@ function build_parser() {
 
 		let current_arg = field_access() || obvious()
 		if (current_arg === undefined) return func
-		const args = [current_arg]	
+		const args = [current_arg]
 		while ((current_arg = field_access() || obvious()) !== undefined)
 			args.push(current_arg)
 		return { kind: 'call', func, args, children: [func, ...args] }
@@ -241,16 +300,17 @@ function build_parser() {
 			result = { kind: 'field-access', source: result, field, children: [result, access_token, field] }
 		}
 		return result
-		
+
 	}
 	function literal() {
 		const literal = try_consume('int') || try_consume('string')
 		if (literal === undefined) return undefined
-		return { kind: 'literal', literal, children: [literal]}
+		return { kind: 'literal', literal, children: [literal] }
 	}
+	/**@returns {undefined|{ kind: 'lambda', params, body, children: [with_token, ...params, body] }} */
 	function lambda() {
 		const with_token = try_consume('with')
-		if (with_token === undefined) return undefined
+		if (with_token === undefined) return undefined;
 		const params = []
 		let current_param;
 		while ((current_param = try_consume('ident')) !== undefined)
@@ -286,6 +346,7 @@ function build_parser() {
 		const right_paren = consume(')')
 		return { ...statements, children: [left_paren, ...statements.children, right_paren] }
 	}
+	/**@returns {undefined|{ ...(statements), children: [do_token, ...statements.children, done_token] }} */
 	function block() {
 		const do_token = try_consume('do')
 		if (do_token === undefined) return undefined
@@ -297,10 +358,10 @@ function build_parser() {
 	return parser
 }
 
-function pprint_ast(ast, ident_size=2, ident_char=' ') {
+function pprint_ast(ast, ident_size = 2, ident_char = ' ') {
 	let result = ''
 	const pad_for = level => ''.padStart(level * ident_size, ident_char)
-	function pprint_internal(node, level=0, should_pad=false) {
+	function pprint_internal(node, level = 0, should_pad = false) {
 		if (node.kind === 'sequence' && node.statements.length === 1)
 			return pprint_internal(node.statements[0], level, should_pad)
 		if (node.kind === 'block')
@@ -317,8 +378,8 @@ function pprint_ast(ast, ident_size=2, ident_char=' ') {
 				if (key === 'kind' || key === 'children') continue
 				if (node[key] === undefined || node[key] === null) continue
 				result += pad_for(level + 1)
-				       + key
-				       + ' = '
+					+ key
+					+ ' = '
 				if (node[key] instanceof Array) {
 					result += '\n'
 					for (const child of node[key])
@@ -344,7 +405,7 @@ class RedactedObject {
 		this.fields.set(name, value)
 	}
 	call() { throw new Error('Redacted Objects are not callable') }
-	to_str() { return `[[REDACTED (${this.fields.size} fields)]]`}
+	to_str() { return `[[REDACTED (${this.fields.size} fields)]]` }
 	is_false() { return false }
 }
 
@@ -372,7 +433,7 @@ class RedactedFunction extends RedactedObject {
 		return super.load_prop(key)
 	}
 	store_prop(key, value) { if (key !== 'call' && key !== 'with_args') super.store_prop(key, value) }
-	to_str() { return `[[REDACTED (${this.debug_info.end - this.debug_info.start} instructions)]]`}
+	to_str() { return `[[REDACTED (${this.debug_info.end - this.debug_info.start} instructions)]]` }
 }
 
 class RedactedArray extends RedactedObject {
@@ -459,18 +520,18 @@ function add_op(opcode, ...args) {
 	operation[opcode] = id
 }
 /*      NAME,          arg0,       arg1 */
-add_op('PUSH',        'data_ref')
+add_op('PUSH', 'data_ref')
 add_op('DROP')
-add_op('LOAD',        'int',      'int')
-add_op('STORE',       'int',      'int')
-add_op('LOAD_PROP',   'data_ref')
-add_op('STORE_PROP',  'data_ref')
-add_op('CALL',        'int')
+add_op('LOAD', 'int', 'int')
+add_op('STORE', 'int', 'int')
+add_op('LOAD_PROP', 'data_ref')
+add_op('STORE_PROP', 'data_ref')
+add_op('CALL', 'int')
 add_op('CREATE_FUNC', 'int')
-add_op('JNO',         'label')
-add_op('JMP',         'label')
+add_op('JNO', 'label')
+add_op('JMP', 'label')
 add_op('RET')
-add_op('COMMENT',     'comment_ref')
+add_op('COMMENT', 'comment_ref')
 
 const primitive_ids = new Map()
 const primitive_list = []
@@ -523,7 +584,7 @@ add_primitive('+', (lhs, rhs) => {
 
 const comment_handlers = new Map()
 
-function compile(parsetree, comments, filename='') {
+function compile(parsetree, comments, filename = '') {
 	let function_id = 0
 	const remaining_functions = [{
 		name: '[[main]]',
@@ -628,8 +689,8 @@ function compile(parsetree, comments, filename='') {
 
 		function visit(node) {
 			switch (node.kind) {
-				case 'literal':  return visit_literal(node)
-				case 'ident':  return visit_ident(node)
+				case 'literal': return visit_literal(node)
+				case 'ident': return visit_ident(node)
 				case 'sequence': return visit_sequence(node)
 				case 'assignment': return visit_assignment(node)
 				case 'field-access': return visit_field_access(node)
@@ -842,7 +903,7 @@ function compile(parsetree, comments, filename='') {
 	function reserve_data(data) {
 		let offset = rodata_offsets.get(data)
 		if (offset !== undefined) return offset
-		offset = rodata.length 
+		offset = rodata.length
 		rodata.push(data)
 		rodata_offsets.set(data, offset)
 		return offset
@@ -860,7 +921,7 @@ function disassemble(compilation_result) {
 	const formatter = {
 		data_ref(v) { return JSON.stringify(compilation_result.rodata[v]) },
 		int(v) { return v.toString() },
-		label(v) { return '0x'+(v+1).toString(16).padStart(4, '0') },
+		label(v) { return '0x' + (v + 1).toString(16).padStart(4, '0') },
 		comment_ref(v) { return compilation_result.comments[v].matched }
 	}
 	for (let i = 0; i < compilation_result.bytecode.length; i++) {
@@ -881,7 +942,7 @@ function disassemble(compilation_result) {
 	return result
 }
 
-function run(compilation_result, pc=0, func, args) {
+function run(compilation_result, pc = 0, func, args) {
 	const stack = [...args]
 	function arg() {
 		return compilation_result.bytecode[++pc]
@@ -895,7 +956,7 @@ function run(compilation_result, pc=0, func, args) {
 	}
 	while (pc <= compilation_result.bytecode.length) {
 		let opcode = compilation_result.bytecode[pc]
-		switch(opcode) {
+		switch (opcode) {
 			case operation.PUSH: {
 				stack.push(redactify(rodata_arg()))
 				break
@@ -927,7 +988,7 @@ function run(compilation_result, pc=0, func, args) {
 					scope = scope.parent
 					depth--
 				}
-				scope.locals[offset] = stack[stack.length-1]
+				scope.locals[offset] = stack[stack.length - 1]
 				break
 			}
 			case operation.LOAD_PROP: {
@@ -989,46 +1050,46 @@ function run(compilation_result, pc=0, func, args) {
 }
 
 function main(args) {
-    const source = require('fs').readFileSync(args.filename, 'utf8')
+	const source = require('fs').readFileSync(args.filename, 'utf8')
 	const parser = build_parser().for_input(source, args.filename)
 	const parser_results = parser.parse('sequence')
 	if (parser_results.parsetree === null || parser_results.parsetree === undefined)
 		throw new Error('Parsing failed')
 
-    if (args.dump_ast) console.log(pprint_ast(parser_results.parsetree))
-    const compiler_results = compile(parser_results.parsetree, parser_results.comments, args.filename)
-    
-    if (args.dump_bytecode) console.log(disassemble(compiler_results))
+	if (args.dump_ast) console.log(pprint_ast(parser_results.parsetree))
+	const compiler_results = compile(parser_results.parsetree, parser_results.comments, args.filename)
 
-    if (args.execute) {
-	    const main = new RedactedFunction(compiler_results.functions[0], compiler_results, null)
-        return main.call()
-    }
-    return RedactedNone
+	if (args.dump_bytecode) console.log(disassemble(compiler_results))
+
+	if (args.execute) {
+		const main = new RedactedFunction(compiler_results.functions[0], compiler_results, null)
+		return main.call()
+	}
+	return RedactedNone
 }
 
 function parse_args() {
-    const args = {
-        filename: null,
-        dump_ast: false,
-        dump_bytecode: false,
-        execute: true
-    }
-    for (const arg of process.argv.slice(2)) {
-        if (arg === '--no-execute') args.execute = false
-        else if (arg === '--dump-ast') args.dump_ast = true
-        else if (arg === '--dump-bytecode') args.dump_bytecode = true
-        else args.filename = arg
-    }
-    if (args.filename === null) {
-        console.log(
-`Usage: ${process.argv[0]} ${process.argv[1]} [options] <filename>
+	const args = {
+		filename: null,
+		dump_ast: false,
+		dump_bytecode: false,
+		execute: true
+	}
+	for (const arg of process.argv.slice(2)) {
+		if (arg === '--no-execute') args.execute = false
+		else if (arg === '--dump-ast') args.dump_ast = true
+		else if (arg === '--dump-bytecode') args.dump_bytecode = true
+		else args.filename = arg
+	}
+	if (args.filename === null) {
+		console.log(
+			`Usage: ${process.argv[0]} ${process.argv[1]} [options] <filename>
     --no-execute:    Perform all the neccesary tasks but don't execute the program
     --dump-ast:      Dump the AST after parsing
     --dump-bytecode: Dump the generated bytecode after compilation`)
-        process.exit(1)
-    }
-    return args
+		process.exit(1)
+	}
+	return args
 }
 
 main(parse_args())
